@@ -31,14 +31,26 @@ export const useAttendance = () => {
     };
 
     /**
-     * Mark attendance for a session
+     * Mark attendance for a session (secure version with wallet-bound hash)
      */
-    const markAttendance = async (appId: number, sessionId: string) => {
+    const markAttendance = async (
+        appId: number, 
+        sessionId: string,
+        qrRound: number,
+        qrHash: Uint8Array
+    ) => {
         if (!activeAddress) throw new Error('No active wallet');
+
+        // Convert qrRound to 8-byte big-endian format
+        const roundBytes = new Uint8Array(8);
+        const view = new DataView(roundBytes.buffer);
+        view.setBigUint64(0, BigInt(qrRound), false);
 
         const appArgs = [
             new Uint8Array(Buffer.from('mark_attendance')),
             new Uint8Array(Buffer.from(sessionId)),
+            roundBytes,
+            qrHash,
         ];
 
         const result = await algorand.send.appCall({
@@ -70,9 +82,14 @@ export const useAttendance = () => {
         ];
 
         // Add attendance window if provided
-        if (attendanceWindowSeconds) {
+        if (attendanceWindowSeconds !== undefined && attendanceWindowSeconds > 0) {
+            console.log('Adding attendance window:', attendanceWindowSeconds, 'seconds');
             appArgs.push(algosdk.encodeUint64(attendanceWindowSeconds));
+        } else {
+            console.log('No attendance window provided, using duration');
         }
+
+        console.log('Total args:', appArgs.length);
 
         const result = await algorand.send.appCall({
             sender: activeAddress,

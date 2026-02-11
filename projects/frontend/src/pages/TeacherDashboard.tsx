@@ -1,7 +1,7 @@
 import React from 'react';
 import { useWallet } from '@txnlab/use-wallet-react';
 import { WalletButton } from '../components/attendance/WalletButton';
-import { QRDisplay } from '../components/attendance/QRDisplay';
+import { DynamicQRDisplay } from '../components/attendance/DynamicQRDisplay';
 import { AttendanceTable } from '../components/attendance/AttendanceTable';
 import { SessionCard } from '../components/attendance/SessionCard';
 import { PlusCircle, LayoutDashboard, FileText, Shield, Loader } from 'lucide-react';
@@ -20,6 +20,7 @@ export const TeacherDashboard: React.FC = () => {
     const [currentSession, setCurrentSession] = React.useState<any>(null);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState('');
+    const [success, setSuccess] = React.useState('');
 
     // Load session info on mount
     React.useEffect(() => {
@@ -73,49 +74,101 @@ export const TeacherDashboard: React.FC = () => {
         try {
             setLoading(true);
             setError('');
+            setSuccess('');
 
             // Convert minutes to seconds for the contract
             const durationSeconds = parseInt(duration) * 60;
             const attendanceWindowSeconds = parseInt(attendanceWindow) * 60;
             
-            const txId = await createSession(
-                ATTENDANCE_APP_ID, 
-                sessionId, 
-                sessionName, 
+            console.log('Creating session with:', {
+                appId: ATTENDANCE_APP_ID,
+                sessionId,
+                sessionName,
                 durationSeconds,
-                attendanceWindowSeconds  // Pass attendance window
-            );
-
-            console.log('Session created, transaction:', txId);
-
-            // Wait for blockchain confirmation (3-5 seconds)
-            await new Promise(resolve => setTimeout(resolve, 5000));
-
-            // Reload session info
-            await loadSessionInfo();
-
-            // Clear form
-            setSessionId('');
-            setSessionName('');
-            setDuration('60');
-            setAttendanceWindow('5');
-
-            setLoading(false);
-            setActiveView('active');
-        } catch (err: any) {
-            console.error('Create session error:', err);
+                attendanceWindowSeconds
+            });
             
-            // Check if error is about pending transaction
-            if (err.message?.includes('pending') || err.message?.includes('4100')) {
-                setError('Please wait for the previous transaction to complete, then try again.');
+            try {
+                const txId = await createSession(
+                    ATTENDANCE_APP_ID, 
+                    sessionId, 
+                    sessionName, 
+                    durationSeconds,
+                    attendanceWindowSeconds  // Pass attendance window
+                );
+
+                console.log('✅ Session created successfully! Transaction:', txId);
+                
+                // Wait for blockchain confirmation
+                console.log('Waiting 4 seconds for blockchain confirmation...');
+                await new Promise(resolve => setTimeout(resolve, 4000));
+
+                // Reload session info
+                console.log('Reloading session info...');
+                const newSessionInfo = await getSessionInfo(ATTENDANCE_APP_ID);
+                
+                // Manually update state with new session
+                if (newSessionInfo && Number(newSessionInfo.is_active) === 1) {
+                    const newSession = {
+                        sessionId: newSessionInfo.session_id,
+                        sessionName: newSessionInfo.session_name,
+                        appId: ATTENDANCE_APP_ID,
+                        startRound: Number(newSessionInfo.start_round),
+                        endRound: Number(newSessionInfo.end_round),
+                        attendanceEndRound: Number(newSessionInfo.attendance_end_round),
+                        totalAttendance: Number(newSessionInfo.total_attendance || 0),
+                    };
+                    
+                    setCurrentSession(newSession);
+                    
+                    // Verify the new session was created
+                    if (newSession.sessionId === sessionId) {
+                        console.log('✅ New session verified!');
+                        setSuccess('Session created successfully!');
+                    } else {
+                        console.log('✅ Session created:', newSession.sessionId);
+                        setSuccess(`Session "${newSession.sessionId}" created successfully!`);
+                    }
+                } else {
+                    setSuccess('Session created! Refresh to see it.');
+                }
+                
+                // Clear form
+                setSessionId('');
+                setSessionName('');
+                setDuration('60');
+                setAttendanceWindow('5');
+
+                setLoading(false);
+                setActiveView('active');
+                
+            } catch (createError: any) {
+                console.error('❌ createSession threw error:', createError);
+                throw createError; // Re-throw to be caught by outer catch
+            }
+
+        } catch (err: any) {
+            console.error('❌ Create session error:', err);
+            console.error('Error message:', err.message);
+            console.error('Error stack:', err.stack);
+            
+            // Don't try to recover from pending transaction errors
+            // Just show the error and let user try again
+            if (err.message?.includes('txn dead') || err.message?.includes('outside of')) {
+                setError('Transaction expired. Please approve faster in your wallet and try again.');
+            } else if (err.message?.includes('pending') || err.message?.includes('4100')) {
+                setError('Transaction in progress. Please wait 10 seconds and try again.');
+            } else if (err.message?.includes('overspend')) {
+                setError('Insufficient balance. Please ensure your wallet has enough ALGO.');
+            } else if (err.message?.includes('logic eval error')) {
+                setError('Contract error: ' + (err.message || 'Unknown contract error'));
             } else {
-                setError(err.message || 'Failed to create session');
+                setError(err.message || 'Failed to create session. Check console for details.');
             }
             
             setLoading(false);
         }
     };
-
     // Mock attendance data - in production, fetch from blockchain
     const mockAttendance = currentSession ? [
         {
@@ -194,6 +247,12 @@ export const TeacherDashboard: React.FC = () => {
                                             <p className="text-sm text-yellow-800">
                                                 Please connect your wallet to create a session
                                             </p>
+                                        </div>
+                                    )}
+
+                                    {success && (
+                                        <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-4">
+                                            <p className="text-sm text-green-800">{success}</p>
                                         </div>
                                     )}
 
@@ -301,7 +360,7 @@ export const TeacherDashboard: React.FC = () => {
 
                                 {/* QR Code Display */}
                                 {currentSession && (
-                                    <QRDisplay
+                                    <DynamicQRDisplay
                                         sessionId={currentSession.sessionId}
                                         appId={currentSession.appId}
                                         sessionName={currentSession.sessionName}
@@ -332,7 +391,7 @@ export const TeacherDashboard: React.FC = () => {
                                             attendanceCount={currentSession.totalAttendance}
                                             endRound={currentSession.endRound}
                                         />
-                                        <QRDisplay
+                                        <DynamicQRDisplay
                                             sessionId={currentSession.sessionId}
                                             appId={currentSession.appId}
                                             sessionName={currentSession.sessionName}

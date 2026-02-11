@@ -4,6 +4,8 @@ import { WalletButton } from '../components/attendance/WalletButton';
 import { CheckCircle, QrCode, Shield, Loader, AlertCircle } from 'lucide-react';
 import { useAttendance } from '../utils/useAttendance';
 import { ATTENDANCE_APP_ID } from '../utils/algorand';
+import { getAlgodConfigFromViteEnvironment } from '../utils/network/getAlgoClientConfigs';
+import algosdk from 'algosdk';
 
 type FlowState = 'connect' | 'scan' | 'confirm' | 'processing' | 'success' | 'error';
 
@@ -26,10 +28,10 @@ export const StudentPage: React.FC = () => {
 
     const handleManualInput = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (sessionId && appId) {
+        if (sessionId && appId && activeAddress) {
             // Check if user needs to opt-in first
             const appIdNum = parseInt(appId);
-            const attendance = await getAttendanceRecord(activeAddress!, appIdNum);
+            const attendance = await getAttendanceRecord(activeAddress, appIdNum);
 
             if (!attendance) {
                 setNeedsOptIn(true);
@@ -62,8 +64,48 @@ export const StudentPage: React.FC = () => {
             setFlowState('processing');
             setError('');
 
+            if (!activeAddress) {
+                throw new Error('No active wallet connected');
+            }
+
             const appIdNum = parseInt(appId);
-            const transactionId = await markAttendance(appIdNum, sessionId);
+
+            // Get current round from blockchain
+            const algodConfig = getAlgodConfigFromViteEnvironment();
+            const algodClient = new algosdk.Algodv2(
+                algodConfig.token,
+                algodConfig.server,
+                algodConfig.port
+            );
+            
+            const status = await algodClient.status().do();
+            const qrRound = status['last-round'];
+
+            // Generate wallet-bound hash: SHA256(sessionId + qrRound + studentAddress)
+            const sessionIdBytes = new TextEncoder().encode(sessionId);
+            
+            // Convert round to 8-byte big-endian
+            const roundBytes = new Uint8Array(8);
+            const view = new DataView(roundBytes.buffer);
+            view.setBigUint64(0, BigInt(qrRound), false);
+            
+            // Decode student address to bytes
+            const studentAddressBytes = algosdk.decodeAddress(activeAddress).publicKey;
+            
+            // Concatenate all components
+            const combined = new Uint8Array(
+                sessionIdBytes.length + roundBytes.length + studentAddressBytes.length
+            );
+            combined.set(sessionIdBytes, 0);
+            combined.set(roundBytes, sessionIdBytes.length);
+            combined.set(studentAddressBytes, sessionIdBytes.length + roundBytes.length);
+            
+            // Compute SHA256 hash
+            const hashBuffer = await crypto.subtle.digest('SHA-256', combined);
+            const qrHash = new Uint8Array(hashBuffer);
+
+            // Call secure mark attendance with 4 args
+            const transactionId = await markAttendance(appIdNum, sessionId, qrRound, qrHash);
 
             setTxId(transactionId);
             setFlowState('success');

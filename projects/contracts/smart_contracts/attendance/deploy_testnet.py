@@ -23,7 +23,7 @@ def main():
     print("=" * 60)
     
     # Connect to TestNet
-    print("\n[1/5] Connecting to TestNet...")
+    print("\n[1/6] Connecting to TestNet...")
     algod_address = "https://testnet-api.algonode.cloud"
     algod_token = ""
     algod_client = algod.AlgodClient(algod_token, algod_address)
@@ -37,7 +37,7 @@ def main():
         return
     
     # Get deployer account
-    print("\n[2/5] Setting up deployer account...")
+    print("\n[2/6] Setting up deployer account...")
     print("\nOptions:")
     print("1. Enter existing mnemonic")
     print("2. Generate new account")
@@ -92,7 +92,7 @@ def main():
         return
     
     # Compile contract
-    print("\n[3/5] Compiling contract...")
+    print("\n[3/6] Compiling contract...")
     try:
         approval_teal = get_approval_program()
         clear_teal = get_clear_program()
@@ -109,14 +109,14 @@ def main():
         return
     
     # Get session details
-    print("\n[4/5] Configure attendance session...")
+    print("\n[4/6] Configure attendance session...")
     session_id = input("Session ID (e.g., CS101_2026_02_11): ").strip()
     session_name = input("Session name (e.g., Computer Science 101): ").strip()
     duration_input = input("Duration in seconds (default 3600): ").strip()
     duration = int(duration_input) if duration_input else 3600
     
     # Deploy
-    print("\n[5/5] Deploying to TestNet...")
+    print("\n[5/6] Deploying to TestNet...")
     try:
         params = algod_client.suggested_params()
         
@@ -158,10 +158,34 @@ def main():
         print(f"\n🔗 View on AlgoExplorer:")
         print(f"https://testnet.algoexplorer.io/application/{app_id}")
         
+        # Opt-in creator to get teacher privileges
+        print("\n[6/6] Opting in creator as teacher...")
+        try:
+            params = algod_client.suggested_params()
+            
+            from algosdk.transaction import ApplicationOptInTxn
+            opt_in_txn = ApplicationOptInTxn(
+                sender=deployer_address,
+                sp=params,
+                index=app_id
+            )
+            
+            signed_opt_in = opt_in_txn.sign(deployer_private_key)
+            opt_in_tx_id = algod_client.send_transaction(signed_opt_in)
+            
+            print(f"📤 Opt-in transaction sent: {opt_in_tx_id}")
+            wait_for_confirmation(algod_client, opt_in_tx_id, 4)
+            
+            print("✅ Creator opted in and granted teacher privileges!")
+        except Exception as e:
+            print(f"⚠️  Opt-in failed: {e}")
+            print("   You'll need to opt-in manually before creating sessions")
+        
         print("\n📝 Next Steps:")
         print("1. Save the app_id for your frontend")
-        print("2. Students must opt-in before marking attendance")
-        print("3. Use QR codes to share app_id + session_id")
+        print("2. You can now create sessions as an authorized teacher")
+        print("3. Other teachers must opt-in before being authorized")
+        print("4. Use manage_teachers.py to authorize additional teachers")
         
         # Save deployment info
         with open("deployment_info.txt", "w") as f:

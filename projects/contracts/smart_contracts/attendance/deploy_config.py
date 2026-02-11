@@ -18,7 +18,7 @@ class AttendanceDeployConfig:
     )
     
     LOCAL_SCHEMA = StateSchema(
-        num_uints=2,  # checked_in, check_in_time
+        num_uints=3,  # checked_in, check_in_time, is_teacher
         num_byte_slices=0
     )
     

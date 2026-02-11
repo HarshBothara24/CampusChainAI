@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { LandingPage } from './pages/LandingPage';
 import { TeacherDashboard } from './pages/TeacherDashboard';
 import { StudentPage } from './pages/StudentPage';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { getAlgodConfigFromViteEnvironment, getKmdConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs';
 
 let supportedWallets: SupportedWallet[];
@@ -54,7 +55,14 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/teacher" element={<TeacherDashboard />} />
+            <Route
+              path="/teacher"
+              element={
+                <ProtectedRoute requireTeacher={true}>
+                  <TeacherDashboard />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/student" element={<StudentPage />} />
           </Routes>
         </BrowserRouter>

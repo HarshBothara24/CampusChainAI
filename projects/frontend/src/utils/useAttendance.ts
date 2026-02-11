@@ -133,12 +133,84 @@ export const useAttendance = () => {
         }
     };
 
+    /**
+     * Add a teacher (admin only)
+     */
+    const addTeacher = async (appId: number, teacherAddress: string) => {
+        if (!activeAddress) throw new Error('No active wallet');
+
+        const appArgs = [
+            new Uint8Array(Buffer.from('add_teacher')),
+        ];
+
+        const result = await algorand.send.appCall({
+            sender: activeAddress,
+            appId: BigInt(appId),
+            args: appArgs,
+            accountReferences: [teacherAddress],
+        });
+
+        return result.txIds[0];
+    };
+
+    /**
+     * Remove a teacher (admin only)
+     */
+    const removeTeacher = async (appId: number, teacherAddress: string) => {
+        if (!activeAddress) throw new Error('No active wallet');
+
+        const appArgs = [
+            new Uint8Array(Buffer.from('remove_teacher')),
+        ];
+
+        const result = await algorand.send.appCall({
+            sender: activeAddress,
+            appId: BigInt(appId),
+            args: appArgs,
+            accountReferences: [teacherAddress],
+        });
+
+        return result.txIds[0];
+    };
+
+    /**
+     * Check if an address is an authorized teacher
+     */
+    const isTeacher = async (address: string, appId: number): Promise<boolean> => {
+        try {
+            const accountInfo = await algorand.client.algod
+                .accountApplicationInformation(address, appId)
+                .do();
+
+            if (!accountInfo.appLocalState) {
+                return false;
+            }
+
+            const localState = accountInfo.appLocalState.keyValue || [];
+            
+            for (const item of localState) {
+                const key = Buffer.from(item.key, 'base64').toString('utf-8');
+                if (key === 'is_teacher') {
+                    return item.value.uint === 1;
+                }
+            }
+
+            return false;
+        } catch (error) {
+            console.error('Error checking teacher status:', error);
+            return false;
+        }
+    };
+
     return {
         optIn,
         markAttendance,
         createSession,
         getAttendanceRecord,
         getSessionInfo,
+        addTeacher,
+        removeTeacher,
+        isTeacher,
     };
 };
 

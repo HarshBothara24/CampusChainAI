@@ -1,0 +1,5 @@
+App ID: 755366519
+Session ID: NLP_2026_02_11
+Session Name: NLP
+Creator: ILUHQ3QQXFHDP3N7FQAREPGHQVVVPQN2BMN3H3722LT5BSMRVPWP6T4GF4
+Explorer: https://testnet.algoexplorer.io/application/755366519

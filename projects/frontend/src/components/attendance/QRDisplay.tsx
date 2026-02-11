@@ -1,6 +1,7 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Clock } from 'lucide-react';
+import { generateQRPayload, getQRTimeRemaining, QR_CODE_REFRESH_INTERVAL } from '../../utils/auth';
 
 interface QRDisplayProps {
     sessionId: string;
@@ -10,11 +11,30 @@ interface QRDisplayProps {
 
 export const QRDisplay: React.FC<QRDisplayProps> = ({ sessionId, appId, sessionName }) => {
     const [copied, setCopied] = React.useState(false);
+    const [qrPayload, setQrPayload] = React.useState(() => generateQRPayload(sessionId, appId));
+    const [timeRemaining, setTimeRemaining] = React.useState(getQRTimeRemaining(qrPayload.expiresAt));
 
-    const qrData = JSON.stringify({
-        appId,
-        sessionId,
-    });
+    // Update countdown timer every second
+    React.useEffect(() => {
+        const interval = setInterval(() => {
+            const remaining = getQRTimeRemaining(qrPayload.expiresAt);
+            setTimeRemaining(remaining);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [qrPayload.expiresAt]);
+
+    // Auto-refresh QR code before it expires
+    React.useEffect(() => {
+        const refreshInterval = setInterval(() => {
+            const newPayload = generateQRPayload(sessionId, appId);
+            setQrPayload(newPayload);
+        }, QR_CODE_REFRESH_INTERVAL);
+
+        return () => clearInterval(refreshInterval);
+    }, [sessionId, appId]);
+
+    const qrData = JSON.stringify(qrPayload);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(sessionId);
@@ -33,6 +53,14 @@ export const QRDisplay: React.FC<QRDisplayProps> = ({ sessionId, appId, sessionN
                     <div className="p-4 bg-white border-2 border-slate-200 rounded-lg">
                         <QRCodeSVG value={qrData} size={256} level="H" />
                     </div>
+                </div>
+
+                {/* Expiration Timer */}
+                <div className="mb-4 flex items-center justify-center gap-2">
+                    <Clock className={`w-4 h-4 ${timeRemaining <= 10 ? 'text-red-500' : 'text-emerald-600'}`} />
+                    <span className={`text-sm font-medium ${timeRemaining <= 10 ? 'text-red-600' : 'text-slate-700'}`}>
+                        Expires in: {timeRemaining}s
+                    </span>
                 </div>
 
                 {/* Session Details */}

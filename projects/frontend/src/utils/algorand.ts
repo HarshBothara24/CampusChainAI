@@ -1,7 +1,7 @@
 import algosdk from 'algosdk';
 
 // Your deployed contract details
-export const ATTENDANCE_APP_ID = 755361335;
+export const ATTENDANCE_APP_ID = 755366519;
 
 // Algorand SDK helper functions
 export class AlgorandService {

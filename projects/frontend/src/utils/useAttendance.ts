@@ -82,15 +82,16 @@ export const useAttendance = () => {
      */
     const getAttendanceRecord = async (studentAddress: string, appId: number) => {
         try {
-            const accountInfo = await algorand.client.algod
+            const accountInfo: any = await algorand.client.algod
                 .accountApplicationInformation(studentAddress, appId)
                 .do();
 
-            if (!accountInfo.appLocalState) {
+            const appLocalState = accountInfo["app-local-state"];
+            if (!appLocalState) {
                 return null;
             }
 
-            const localState = accountInfo.appLocalState.keyValue || [];
+            const localState = appLocalState["key-value"] || [];
             const attendance: any = {};
 
             localState.forEach((item: any) => {
@@ -178,27 +179,117 @@ export const useAttendance = () => {
      */
     const isTeacher = async (address: string, appId: number): Promise<boolean> => {
         try {
-            const accountInfo = await algorand.client.algod
+            // First, check if this address is the creator
+            const appInfo = await algorand.client.algod.getApplicationByID(appId).do();
+            const creator = appInfo.params.creator;
+            
+            console.log('Checking teacher status for:', address);
+            console.log('Contract creator:', creator);
+            
+            // If user is the creator, they're automatically a teacher
+            if (address === String(creator)) {
+                console.log('User is the creator - automatically authorized');
+                return true;
+            }
+
+            // Otherwise, check local state
+            const accountInfo: any = await algorand.client.algod
                 .accountApplicationInformation(address, appId)
                 .do();
 
-            if (!accountInfo.appLocalState) {
+            console.log('Full account info:', JSON.stringify(accountInfo, null, 2));
+
+            const appLocalState = accountInfo["app-local-state"];
+            if (!appLocalState) {
+                console.log('No app-local-state found');
                 return false;
             }
 
-            const localState = accountInfo.appLocalState.keyValue || [];
+            console.log('App local state:', JSON.stringify(appLocalState, null, 2));
+
+            const localState = appLocalState["key-value"] || [];
+            console.log('Local state key-value:', JSON.stringify(localState, null, 2));
             
             for (const item of localState) {
                 const key = Buffer.from(item.key, 'base64').toString('utf-8');
+                console.log(`Key: ${key}, Value:`, item.value);
                 if (key === 'is_teacher') {
-                    return item.value.uint === 1;
+                    const isTeacherValue = item.value.uint === 1;
+                    console.log(`is_teacher value: ${isTeacherValue}`);
+                    return isTeacherValue;
                 }
             }
 
+            console.log('is_teacher key not found in local state');
             return false;
         } catch (error) {
             console.error('Error checking teacher status:', error);
             return false;
+        }
+    };
+
+    /**
+     * Get the contract creator address
+     */
+    const getCreator = async (appId: number): Promise<string | null> => {
+        try {
+            const appInfo = await algorand.client.algod.getApplicationByID(appId).do();
+            return String(appInfo.params.creator);
+        } catch (error) {
+            console.error('Error fetching creator:', error);
+            return null;
+        }
+    };
+
+    /**
+     * Get all accounts that have opted into the app
+     */
+    const getOptedInAccounts = async (appId: number) => {
+        try {
+            // Use Algorand Indexer to get all accounts opted into this app
+            const indexerUrl = 'https://testnet-idx.algonode.cloud';
+            const response = await fetch(
+                `${indexerUrl}/v2/accounts?application-id=${appId}&limit=100`
+            );
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch opted-in accounts');
+            }
+
+            const data = await response.json();
+            const accounts = data.accounts || [];
+
+            // Process each account to get their local state
+            const processedAccounts = await Promise.all(
+                accounts.map(async (account: any) => {
+                    const address = account.address;
+                    const appLocalState = account['apps-local-state']?.find(
+                        (app: any) => app.id === appId
+                    );
+
+                    if (!appLocalState) {
+                        return null;
+                    }
+
+                    const keyValue = appLocalState['key-value'] || [];
+                    const state: any = { address };
+
+                    keyValue.forEach((item: any) => {
+                        const key = Buffer.from(item.key, 'base64').toString('utf-8');
+                        const value = item.value.type === 1
+                            ? Buffer.from(item.value.bytes, 'base64').toString('utf-8')
+                            : item.value.uint;
+                        state[key] = value;
+                    });
+
+                    return state;
+                })
+            );
+
+            return processedAccounts.filter(account => account !== null);
+        } catch (error) {
+            console.error('Error fetching opted-in accounts:', error);
+            return [];
         }
     };
 
@@ -211,6 +302,8 @@ export const useAttendance = () => {
         addTeacher,
         removeTeacher,
         isTeacher,
+        getCreator,
+        getOptedInAccounts,
     };
 };
 

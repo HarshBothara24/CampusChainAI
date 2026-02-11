@@ -31,7 +31,7 @@ export const LandingPage: React.FC = () => {
                         Secure, transparent, and fraud-proof attendance tracking powered by Algorand blockchain
                         and artificial intelligence.
                     </p>
-                    <div className="flex gap-4 justify-center">
+                    <div className="flex gap-4 justify-center flex-wrap">
                         <Link
                             to="/teacher"
                             className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white font-medium rounded-md hover:bg-emerald-700 transition-colors"
@@ -44,6 +44,13 @@ export const LandingPage: React.FC = () => {
                             className="inline-flex items-center gap-2 px-6 py-3 bg-white border-2 border-slate-300 text-slate-700 font-medium rounded-md hover:bg-slate-50 transition-colors"
                         >
                             Mark Attendance
+                        </Link>
+                        <Link
+                            to="/admin"
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 text-white font-medium rounded-md hover:bg-slate-800 transition-colors"
+                        >
+                            <Shield className="w-4 h-4" />
+                            Admin Panel
                         </Link>
                     </div>
                 </div>

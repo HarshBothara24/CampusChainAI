@@ -45,14 +45,26 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                     setNeedsOptIn(true);
                     setAuthorized(false);
                 } else {
-                    // Check if user is authorized teacher
+                    // User has opted in, check if they're a teacher
                     const teacherStatus = await isTeacher(activeAddress, ATTENDANCE_APP_ID);
                     setAuthorized(teacherStatus);
                     setNeedsOptIn(false);
                 }
             } catch (err) {
                 console.error('Error checking authorization:', err);
-                setError('Failed to check authorization status');
+                // If there's an error, try to check teacher status anyway
+                try {
+                    const teacherStatus = await isTeacher(activeAddress, ATTENDANCE_APP_ID);
+                    if (teacherStatus) {
+                        // User is a teacher, they must be opted in
+                        setAuthorized(true);
+                        setNeedsOptIn(false);
+                    } else {
+                        setError('Failed to check authorization status');
+                    }
+                } catch (innerErr) {
+                    setError('Failed to check authorization status');
+                }
             } finally {
                 setLoading(false);
             }
@@ -69,9 +81,19 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
             setOptingIn(true);
             setError('');
             
-            await optIn(ATTENDANCE_APP_ID);
+            // Try to opt-in
+            try {
+                await optIn(ATTENDANCE_APP_ID);
+            } catch (optInErr: any) {
+                // If error is "already opted in", that's actually fine
+                if (optInErr.message && optInErr.message.includes('already opted in')) {
+                    console.log('User already opted in, continuing...');
+                } else {
+                    throw optInErr;
+                }
+            }
             
-            // Recheck authorization after opt-in
+            // Recheck authorization after opt-in (or if already opted in)
             const teacherStatus = await isTeacher(activeAddress, ATTENDANCE_APP_ID);
             setAuthorized(teacherStatus);
             setNeedsOptIn(false);
@@ -153,12 +175,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                             {optingIn ? (
                                 <>
                                     <Loader className="w-4 h-4 animate-spin" />
-                                    Opting In...
+                                    Checking Status...
                                 </>
                             ) : (
-                                'Opt-In to App'
+                                'Continue to Dashboard'
                             )}
                         </button>
+                        <p className="text-xs text-slate-500">
+                            If you're already opted in, this will check your authorization status
+                        </p>
                         <a
                             href="/"
                             className="block text-slate-600 hover:text-slate-900 text-sm"

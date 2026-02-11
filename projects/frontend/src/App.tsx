@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { LandingPage } from './pages/LandingPage';
 import { TeacherDashboard } from './pages/TeacherDashboard';
 import { StudentPage } from './pages/StudentPage';
+import { AdminPanel } from './pages/AdminPanel';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { getAlgodConfigFromViteEnvironment, getKmdConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs';
 
@@ -64,6 +65,7 @@ export default function App() {
               }
             />
             <Route path="/student" element={<StudentPage />} />
+            <Route path="/admin" element={<AdminPanel />} />
           </Routes>
         </BrowserRouter>
       </WalletProvider>

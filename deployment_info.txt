@@ -1,5 +1,11 @@
-App ID: 755361335
-Session ID: NLP01_2026_02_11
-Session Name: Natural Language Processing
-Creator: 6AHUGIP2MH3PA63N3SYYOADHNMABLTAFNWK2IPL2V5FQ6TAB32SXR6WNBM
-Explorer: https://testnet.algoexplorer.io/application/755361335
+App ID: 755366519
+Session ID: NLP_2026_02_11
+Session Name: NLP
+Creator: ILUHQ3QQXFHDP3N7FQAREPGHQVVVPQN2BMN3H3722LT5BSMRVPWP6T4GF4
+Explorer: https://testnet.algoexplorer.io/application/755366519
+
+IMPORTANT NOTES:
+- Frontend App ID has been updated to: 755366519
+- Creator wallet needs to OPT-IN first via teacher dashboard
+- After opt-in, creator automatically gets teacher privileges
+- Other teachers: opt-in first, then admin authorizes them via manage_teachers.py

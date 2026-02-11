@@ -1,0 +1,5 @@
+App ID: 755361335
+Session ID: NLP01_2026_02_11
+Session Name: Natural Language Processing
+Creator: 6AHUGIP2MH3PA63N3SYYOADHNMABLTAFNWK2IPL2V5FQ6TAB32SXR6WNBM
+Explorer: https://testnet.algoexplorer.io/application/755361335

@@ -131,19 +131,9 @@ export const StudentPage: React.FC = () => {
                                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                     required
                                 />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">
-                                    App ID
-                                </label>
-                                <input
-                                    type="text"
-                                    value={appId}
-                                    onChange={(e) => setAppId(e.target.value)}
-                                    placeholder="e.g., 755361335"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    required
-                                />
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Enter the session ID provided by your teacher
+                                </p>
                             </div>
                             <button
                                 type="submit"
@@ -174,10 +164,6 @@ export const StudentPage: React.FC = () => {
                             <div className="flex justify-between py-3 border-b border-slate-200">
                                 <span className="text-slate-600">Session ID</span>
                                 <span className="font-mono text-slate-900">{sessionId}</span>
-                            </div>
-                            <div className="flex justify-between py-3 border-b border-slate-200">
-                                <span className="text-slate-600">App ID</span>
-                                <span className="font-mono text-slate-900">{appId}</span>
                             </div>
                             <div className="flex justify-between py-3 border-b border-slate-200">
                                 <span className="text-slate-600">Your Wallet</span>

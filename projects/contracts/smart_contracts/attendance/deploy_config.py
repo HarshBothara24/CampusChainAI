@@ -13,12 +13,12 @@ class AttendanceDeployConfig:
     
     # State schema
     GLOBAL_SCHEMA = StateSchema(
-        num_uints=4,  # start_time, end_time, is_active, total_attendance
+        num_uints=5,  # start_round, end_round, attendance_end_round, is_active, total_attendance
         num_byte_slices=3  # session_id, session_name, creator
     )
     
     LOCAL_SCHEMA = StateSchema(
-        num_uints=3,  # checked_in, check_in_time, is_teacher
+        num_uints=3,  # checked_in, check_in_round, is_teacher
         num_byte_slices=0
     )
     

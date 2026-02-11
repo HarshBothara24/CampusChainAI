@@ -57,7 +57,8 @@ export const useAttendance = () => {
         appId: number,
         sessionId: string,
         sessionName: string,
-        durationSeconds: number
+        durationSeconds: number,
+        attendanceWindowSeconds?: number  // Optional: defaults to durationSeconds
     ) => {
         if (!activeAddress) throw new Error('No active wallet');
 
@@ -67,6 +68,11 @@ export const useAttendance = () => {
             new Uint8Array(Buffer.from(sessionName)),
             algosdk.encodeUint64(durationSeconds),
         ];
+
+        // Add attendance window if provided
+        if (attendanceWindowSeconds) {
+            appArgs.push(algosdk.encodeUint64(attendanceWindowSeconds));
+        }
 
         const result = await algorand.send.appCall({
             sender: activeAddress,

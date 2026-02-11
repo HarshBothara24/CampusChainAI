@@ -1,21 +1,19 @@
 """
-CampusChain AI - Attendance Smart Contract (Multi-Teacher + Anti-Proxy Security)
+CampusChain AI - Attendance Smart Contract V2 (Anti-Proxy Security)
 Built with PyTeal for Algorand blockchain
 
-Features:
-- Multi-teacher authorization using local state
-- Wallet-bound dynamic QR codes (anti-proxy security)
-- Round-based expiry (prevents QR sharing)
-- Session creation and management
-- Duplicate attendance prevention
-- On-chain verification
+SECURITY UPGRADE: Wallet-Bound Dynamic QR Codes
+- QR codes are bound to specific wallet addresses
+- QR codes expire after 5 rounds (~15 seconds)
+- Prevents QR sharing and proxy attendance
+- Maintains all existing features
 """
 
 from pyteal import *
 
 def approval_program():
     """
-    Main approval program for attendance contract
+    Main approval program for attendance contract with anti-proxy security
     
     Global State Schema (per session):
     - session_id (Bytes): Unique session identifier
@@ -32,11 +30,6 @@ def approval_program():
       - check_in_round (Int): Round number when attendance was marked
     - For teachers:
       - is_teacher (Int): Authorization flag (1=authorized, 0=not authorized)
-    
-    Security Features:
-    - QR codes are wallet-bound (cannot be shared)
-    - QR codes expire after 5 rounds (~15 seconds)
-    - Hash validation: SHA256(session_id + qr_round + student_address)
     """
     
     # Global state keys
@@ -45,7 +38,6 @@ def approval_program():
     creator_key = Bytes("creator")
     start_round_key = Bytes("start_round")
     end_round_key = Bytes("end_round")
-    attendance_end_round_key = Bytes("attendance_end_round")  # New: when attendance window closes
     is_active_key = Bytes("is_active")
     total_attendance_key = Bytes("total_attendance")
     
@@ -59,8 +51,8 @@ def approval_program():
     
     # Helper function to check if sender is authorized teacher
     is_authorized_teacher = Or(
-        Txn.sender() == App.globalGet(creator_key),  # Creator is always authorized
-        App.localGet(Txn.sender(), is_teacher_key) == Int(1)  # Or has teacher flag
+        Txn.sender() == App.globalGet(creator_key),
+        App.localGet(Txn.sender(), is_teacher_key) == Int(1)
     )
     
     # Application call handlers
@@ -72,38 +64,19 @@ def approval_program():
         App.globalPut(start_round_key, Global.round()),
         # Duration in rounds: duration_seconds / 3 (approx 3 sec per round)
         App.globalPut(end_round_key, Global.round() + (Btoi(Txn.application_args[2]) / Int(3))),
-        # Attendance window: If 4th arg provided, use it; otherwise same as end_round
-        App.globalPut(
-            attendance_end_round_key,
-            If(Txn.application_args.length() > Int(3))
-            .Then(Global.round() + (Btoi(Txn.application_args[3]) / Int(3)))
-            .Else(Global.round() + (Btoi(Txn.application_args[2]) / Int(3)))
-        ),
         App.globalPut(is_active_key, Int(1)),
         App.globalPut(total_attendance_key, Int(0)),
-        # Note: Creator must opt-in separately to get teacher privileges
         Approve()
     ])
     
     # Method: Create new attendance session
-    # Args: ["create_session", session_id, session_name, duration_seconds, attendance_window_seconds (optional)]
+    # Args: ["create_session", session_id, session_name, duration_seconds]
     create_session = Seq([
-        # Verify caller is an authorized teacher
         Assert(is_authorized_teacher),
-        
-        # Update session details
         App.globalPut(session_id_key, Txn.application_args[1]),
         App.globalPut(session_name_key, Txn.application_args[2]),
         App.globalPut(start_round_key, Global.round()),
-        # Convert duration from seconds to rounds (approx 3 seconds per round)
         App.globalPut(end_round_key, Global.round() + (Btoi(Txn.application_args[3]) / Int(3))),
-        # Attendance window: If 5th arg provided, use it; otherwise same as end_round
-        App.globalPut(
-            attendance_end_round_key,
-            If(Txn.application_args.length() > Int(4))
-            .Then(Global.round() + (Btoi(Txn.application_args[4]) / Int(3)))
-            .Else(Global.round() + (Btoi(Txn.application_args[3]) / Int(3)))
-        ),
         App.globalPut(is_active_key, Int(1)),
         App.globalPut(total_attendance_key, Int(0)),
         Approve()
@@ -111,35 +84,32 @@ def approval_program():
     
     # Method: Mark student attendance with wallet-bound QR validation
     # Args: ["mark_attendance", session_id, qr_round, qr_hash]
-    # 
-    # Security: QR hash must equal SHA256(session_id + qr_round + Txn.sender())
-    # This binds the QR to a specific wallet, preventing sharing
     mark_attendance = Seq([
         # 1. Verify session is active
         Assert(App.globalGet(is_active_key) == Int(1)),
         
-        # 2. Verify attendance window hasn't closed (use attendance_end_round, not end_round)
-        Assert(Global.round() <= App.globalGet(attendance_end_round_key)),
+        # 2. Verify session hasn't expired (round-based)
+        Assert(Global.round() <= App.globalGet(end_round_key)),
         
         # 3. Verify session_id matches
         Assert(Txn.application_args[1] == App.globalGet(session_id_key)),
         
-        # 4. Verify student hasn't already checked in (duplicate prevention)
+        # 4. Verify student hasn't already checked in
         Assert(App.localGet(Txn.sender(), checked_in_key) == Int(0)),
         
-        # 5. Verify qr_round is 8 bytes (uint64)
-        Assert(Len(Txn.application_args[2]) == Int(8)),
+        # 5. Extract qr_round from args
+        # qr_round is passed as bytes, convert to int
+        Assert(Len(Txn.application_args[2]) == Int(8)),  # Must be 8 bytes (uint64)
         
-        # 6. Verify QR is not older than 5 rounds (anti-replay, ~15 seconds)
+        # 6. Verify QR is not older than 5 rounds (anti-replay)
         Assert(Global.round() - Btoi(Txn.application_args[2]) <= QR_VALIDITY_ROUNDS),
         
-        # 7. Verify wallet-bound hash
-        # Expected hash = SHA256(session_id + qr_round + sender_address)
-        # This ensures QR can only be used by the intended wallet
+        # 7. Compute expected hash: SHA256(session_id + qr_round + sender_address)
+        # This binds the QR to the specific wallet
         Assert(
             Txn.application_args[3] == Sha256(
                 Concat(
-                    Txn.application_args[1],  # session_id (bytes)
+                    Txn.application_args[1],  # session_id
                     Txn.application_args[2],  # qr_round (8 bytes)
                     Txn.sender()              # student wallet address (32 bytes)
                 )
@@ -158,57 +128,38 @@ def approval_program():
     
     # Method: Close attendance session
     close_session = Seq([
-        # Verify caller is an authorized teacher
         Assert(is_authorized_teacher),
-        
-        # Mark session as inactive
         App.globalPut(is_active_key, Int(0)),
         Approve()
     ])
     
     # Method: Add teacher (admin only)
-    # Args: ["add_teacher"]
-    # Accounts: [teacher_address]
     add_teacher = Seq([
-        # Only creator can add teachers
         Assert(Txn.sender() == App.globalGet(creator_key)),
-        
-        # Verify teacher address is provided in accounts array
         Assert(Txn.accounts.length() > Int(0)),
-        
-        # Grant teacher privileges to the specified account
         App.localPut(Txn.accounts[1], is_teacher_key, Int(1)),
         Approve()
     ])
     
     # Method: Remove teacher (admin only)
-    # Args: ["remove_teacher"]
-    # Accounts: [teacher_address]
     remove_teacher = Seq([
-        # Only creator can remove teachers
         Assert(Txn.sender() == App.globalGet(creator_key)),
-        
-        # Verify teacher address is provided in accounts array
         Assert(Txn.accounts.length() > Int(0)),
-        
-        # Revoke teacher privileges
         App.localPut(Txn.accounts[1], is_teacher_key, Int(0)),
         Approve()
     ])
     
     # Method: Opt-in (required for local state)
     on_opt_in = Seq([
-        # Initialize local state (works for both students and teachers)
         App.localPut(Txn.sender(), checked_in_key, Int(0)),
         App.localPut(Txn.sender(), check_in_round_key, Int(0)),
-        # If sender is creator, automatically grant teacher privileges
         If(Txn.sender() == App.globalGet(creator_key))
         .Then(App.localPut(Txn.sender(), is_teacher_key, Int(1)))
         .Else(App.localPut(Txn.sender(), is_teacher_key, Int(0))),
         Approve()
     ])
     
-    # Method router based on application args
+    # Method router
     program = Cond(
         [Txn.application_id() == Int(0), on_creation],
         [Txn.on_completion() == OnComplete.OptIn, on_opt_in],
@@ -226,10 +177,7 @@ def approval_program():
 
 
 def clear_state_program():
-    """
-    Clear state program (called when user clears local state)
-    Always approve to allow students to opt-out
-    """
+    """Clear state program"""
     return Approve()
 
 
@@ -244,8 +192,7 @@ def get_clear_program():
 
 
 if __name__ == "__main__":
-    # Compile and print TEAL code
-    print("=== APPROVAL PROGRAM (Multi-Teacher + Anti-Proxy) ===")
+    print("=== APPROVAL PROGRAM (V2 - Anti-Proxy) ===")
     print(get_approval_program())
     print("\n=== CLEAR STATE PROGRAM ===")
     print(get_clear_program())

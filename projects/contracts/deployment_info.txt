@@ -1,5 +1,5 @@
-App ID: 755366519
-Session ID: NLP_2026_02_11
-Session Name: NLP
+App ID: 755374456
+Session ID: GenAI_11_02_2026
+Session Name: Generative AI
 Creator: ILUHQ3QQXFHDP3N7FQAREPGHQVVVPQN2BMN3H3722LT5BSMRVPWP6T4GF4
-Explorer: https://testnet.algoexplorer.io/application/755366519
+Explorer: https://testnet.algoexplorer.io/application/755374456

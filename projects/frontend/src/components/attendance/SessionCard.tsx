@@ -6,7 +6,8 @@ interface SessionCardProps {
     sessionName: string;
     isActive: boolean;
     attendanceCount: number;
-    endTime: number;
+    endRound?: number;
+    endTime?: number; // Keep for backward compatibility
     onClick?: () => void;
 }
 
@@ -15,20 +16,34 @@ export const SessionCard: React.FC<SessionCardProps> = ({
     sessionName,
     isActive,
     attendanceCount,
+    endRound,
     endTime,
     onClick,
 }) => {
     const getTimeRemaining = () => {
-        const now = Math.floor(Date.now() / 1000);
-        const remaining = endTime - now;
+        // If using round-based timing
+        if (endRound) {
+            // Approximate: 3 seconds per round
+            // We can't get exact current round from frontend without API call
+            // So we'll just show the end round number
+            return `Ends at round ${endRound}`;
+        }
+        
+        // Fallback to timestamp-based (old system)
+        if (endTime) {
+            const now = Math.floor(Date.now() / 1000);
+            const remaining = endTime - now;
 
-        if (remaining <= 0) return 'Expired';
+            if (remaining <= 0) return 'Expired';
 
-        const hours = Math.floor(remaining / 3600);
-        const minutes = Math.floor((remaining % 3600) / 60);
+            const hours = Math.floor(remaining / 3600);
+            const minutes = Math.floor((remaining % 3600) / 60);
 
-        if (hours > 0) return `${hours}h ${minutes}m remaining`;
-        return `${minutes}m remaining`;
+            if (hours > 0) return `${hours}h ${minutes}m remaining`;
+            return `${minutes}m remaining`;
+        }
+        
+        return 'Active';
     };
 
     return (

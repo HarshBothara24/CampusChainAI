@@ -1,11 +1,12 @@
-App ID: 755366519
-Session ID: NLP_2026_02_11
-Session Name: NLP
+App ID: 755374456
+Session ID: GenAI_11_02_2026
+Session Name: Generative AI
 Creator: ILUHQ3QQXFHDP3N7FQAREPGHQVVVPQN2BMN3H3722LT5BSMRVPWP6T4GF4
-Explorer: https://testnet.algoexplorer.io/application/755366519
+Explorer: https://testnet.algoexplorer.io/application/755374456
 
 IMPORTANT NOTES:
-- Frontend App ID has been updated to: 755366519
-- Creator wallet needs to OPT-IN first via teacher dashboard
-- After opt-in, creator automatically gets teacher privileges
-- Other teachers: opt-in first, then admin authorizes them via manage_teachers.py
+- This is the NEW contract with anti-proxy security features
+- Uses round-based timing (start_round, end_round)
+- Wallet-bound QR codes with SHA256 validation
+- Creator wallet is already opted in with teacher privileges
+- Frontend App ID updated to: 755374037ut

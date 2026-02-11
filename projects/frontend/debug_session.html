@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Session Info</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .section {
+            background: #252526;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .key { color: #9cdcfe; }
+        .value { color: #ce9178; }
+        .number { color: #b5cea8; }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        pre {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Session Info - App ID: 755366519</h1>
+    
+    <button onclick="fetchSessionInfo()">Fetch Session Info</button>
+    <button onclick="fetchRawGlobalState()">Fetch Raw Global State</button>
+    
+    <div class="section">
+        <h2>Session Info (Parsed)</h2>
+        <pre id="sessionInfo">Click "Fetch Session Info" to load...</pre>
+    </div>
+    
+    <div class="section">
+        <h2>Raw Global State</h2>
+        <pre id="rawState">Click "Fetch Raw Global State" to load...</pre>
+    </div>
+
+    <script>
+        const APP_ID = 755374037;
+        const ALGOD_URL = 'https://testnet-api.algonode.cloud';
+
+        async function fetchSessionInfo() {
+            try {
+                const response = await fetch(`${ALGOD_URL}/v2/applications/${APP_ID}`);
+                const data = await response.json();
+                
+                const globalState = data.params['global-state'] || [];
+                const session = {};
+                
+                globalState.forEach(item => {
+                    const key = atob(item.key);
+                    let value;
+                    
+                    if (item.value.type === 1) {
+                        // Bytes
+                        value = atob(item.value.bytes);
+                    } else {
+                        // Uint
+                        value = item.value.uint;
+                    }
+                    
+                    session[key] = value;
+                });
+                
+                document.getElementById('sessionInfo').textContent = JSON.stringify(session, null, 2);
+                
+                // Check if session is active
+                if (session.is_active === 1) {
+                    console.log('✅ Session is ACTIVE');
+                } else {
+                    console.log('❌ Session is INACTIVE');
+                }
+                
+            } catch (error) {
+                document.getElementById('sessionInfo').textContent = 'Error: ' + error.message;
+                console.error(error);
+            }
+        }
+
+        async function fetchRawGlobalState() {
+            try {
+                const response = await fetch(`${ALGOD_URL}/v2/applications/${APP_ID}`);
+                const data = await response.json();
+                
+                document.getElementById('rawState').textContent = JSON.stringify(data.params, null, 2);
+                
+            } catch (error) {
+                document.getElementById('rawState').textContent = 'Error: ' + error.message;
+                console.error(error);
+            }
+        }
+
+        // Auto-fetch on load
+        window.onload = () => {
+            fetchSessionInfo();
+        };
+    </script>
+</body>
+</html>

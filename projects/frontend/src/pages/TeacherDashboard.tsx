@@ -15,7 +15,8 @@ export const TeacherDashboard: React.FC = () => {
     const [activeView, setActiveView] = React.useState<'create' | 'active' | 'records'>('create');
     const [sessionId, setSessionId] = React.useState('');
     const [sessionName, setSessionName] = React.useState('');
-    const [duration, setDuration] = React.useState('3600');
+    const [duration, setDuration] = React.useState('60'); // Changed to minutes
+    const [attendanceWindow, setAttendanceWindow] = React.useState('5'); // New: attendance window in minutes
     const [currentSession, setCurrentSession] = React.useState<any>(null);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState('');
@@ -28,17 +29,36 @@ export const TeacherDashboard: React.FC = () => {
     const loadSessionInfo = async () => {
         try {
             const sessionInfo = await getSessionInfo(ATTENDANCE_APP_ID);
-            if (sessionInfo && sessionInfo.is_active === 1) {
+            console.log('Loaded session info:', sessionInfo);
+            
+            // Convert BigInt to Number for comparison
+            const isActive = typeof sessionInfo?.is_active === 'bigint' 
+                ? Number(sessionInfo.is_active) 
+                : sessionInfo?.is_active;
+            
+            if (sessionInfo && isActive === 1) {
                 setCurrentSession({
                     sessionId: sessionInfo.session_id,
                     sessionName: sessionInfo.session_name,
                     appId: ATTENDANCE_APP_ID,
-                    endTime: sessionInfo.end_time,
-                    totalAttendance: sessionInfo.total_attendance || 0,
+                    startRound: typeof sessionInfo.start_round === 'bigint' 
+                        ? Number(sessionInfo.start_round) 
+                        : sessionInfo.start_round,
+                    endRound: typeof sessionInfo.end_round === 'bigint' 
+                        ? Number(sessionInfo.end_round) 
+                        : sessionInfo.end_round,
+                    totalAttendance: typeof sessionInfo.total_attendance === 'bigint' 
+                        ? Number(sessionInfo.total_attendance) 
+                        : (sessionInfo.total_attendance || 0),
                 });
+                console.log('✅ Active session set successfully');
+            } else {
+                console.log('No active session found or session is inactive');
+                setCurrentSession(null);
             }
         } catch (err) {
             console.error('Error loading session:', err);
+            setCurrentSession(null);
         }
     };
 
@@ -54,17 +74,44 @@ export const TeacherDashboard: React.FC = () => {
             setLoading(true);
             setError('');
 
-            const durationNum = parseInt(duration);
-            await createSession(ATTENDANCE_APP_ID, sessionId, sessionName, durationNum);
+            // Convert minutes to seconds for the contract
+            const durationSeconds = parseInt(duration) * 60;
+            const attendanceWindowSeconds = parseInt(attendanceWindow) * 60;
+            
+            const txId = await createSession(
+                ATTENDANCE_APP_ID, 
+                sessionId, 
+                sessionName, 
+                durationSeconds,
+                attendanceWindowSeconds  // Pass attendance window
+            );
+
+            console.log('Session created, transaction:', txId);
+
+            // Wait for blockchain confirmation (3-5 seconds)
+            await new Promise(resolve => setTimeout(resolve, 5000));
 
             // Reload session info
             await loadSessionInfo();
+
+            // Clear form
+            setSessionId('');
+            setSessionName('');
+            setDuration('60');
+            setAttendanceWindow('5');
 
             setLoading(false);
             setActiveView('active');
         } catch (err: any) {
             console.error('Create session error:', err);
-            setError(err.message || 'Failed to create session');
+            
+            // Check if error is about pending transaction
+            if (err.message?.includes('pending') || err.message?.includes('4100')) {
+                setError('Please wait for the previous transaction to complete, then try again.');
+            } else {
+                setError(err.message || 'Failed to create session');
+            }
+            
             setLoading(false);
         }
     };
@@ -187,21 +234,54 @@ export const TeacherDashboard: React.FC = () => {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">
-                                                Duration (seconds)
+                                                Session Duration (minutes)
                                             </label>
                                             <input
                                                 type="number"
                                                 value={duration}
                                                 onChange={(e) => setDuration(e.target.value)}
-                                                placeholder="3600"
+                                                placeholder="60"
+                                                min="1"
                                                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                                 required
                                                 disabled={loading}
                                             />
                                             <p className="text-xs text-slate-500 mt-1">
-                                                Default: 3600 seconds (1 hour)
+                                                How long the class/session will last (e.g., 60 minutes)
                                             </p>
                                         </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                Attendance Window (minutes)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={attendanceWindow}
+                                                onChange={(e) => setAttendanceWindow(e.target.value)}
+                                                placeholder="5"
+                                                min="1"
+                                                max={duration}
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                                required
+                                                disabled={loading}
+                                            />
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                How long students have to mark attendance (e.g., 2-5 minutes)
+                                            </p>
+                                        </div>
+                                        
+                                        {/* Info box */}
+                                        <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                            <p className="text-xs text-blue-900 font-medium mb-1">
+                                                📋 Example:
+                                            </p>
+                                            <ul className="text-xs text-blue-800 space-y-0.5">
+                                                <li>• Session Duration: 60 minutes (class length)</li>
+                                                <li>• Attendance Window: 5 minutes (time to mark attendance)</li>
+                                                <li>• Students must mark attendance within first 5 minutes</li>
+                                            </ul>
+                                        </div>
+
                                         <button
                                             type="submit"
                                             disabled={loading || !activeAddress}
@@ -233,7 +313,16 @@ export const TeacherDashboard: React.FC = () => {
                         {/* Active Sessions View */}
                         {activeView === 'active' && (
                             <div className="space-y-4">
-                                <h2 className="text-xl font-semibold text-slate-900">Active Sessions</h2>
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-xl font-semibold text-slate-900">Active Sessions</h2>
+                                    <button
+                                        onClick={loadSessionInfo}
+                                        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-emerald-50 text-emerald-700 rounded-md hover:bg-emerald-100 transition-colors"
+                                    >
+                                        <Loader className="w-4 h-4" />
+                                        Refresh
+                                    </button>
+                                </div>
                                 {currentSession ? (
                                     <>
                                         <SessionCard
@@ -241,7 +330,7 @@ export const TeacherDashboard: React.FC = () => {
                                             sessionName={currentSession.sessionName}
                                             isActive={true}
                                             attendanceCount={currentSession.totalAttendance}
-                                            endTime={currentSession.endTime}
+                                            endRound={currentSession.endRound}
                                         />
                                         <QRDisplay
                                             sessionId={currentSession.sessionId}
@@ -251,10 +340,13 @@ export const TeacherDashboard: React.FC = () => {
                                     </>
                                 ) : (
                                     <div className="bg-white border border-slate-200 rounded-lg p-8 text-center">
-                                        <p className="text-slate-500">No active sessions</p>
+                                        <p className="text-slate-500 mb-2">No active sessions</p>
+                                        <p className="text-xs text-slate-400 mb-4">
+                                            If you just created a session, click Refresh above or wait a few seconds
+                                        </p>
                                         <button
                                             onClick={() => setActiveView('create')}
-                                            className="mt-4 text-emerald-600 hover:text-emerald-700 font-medium"
+                                            className="text-emerald-600 hover:text-emerald-700 font-medium"
                                         >
                                             Create a session
                                         </button>

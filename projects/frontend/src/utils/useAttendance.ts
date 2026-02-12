@@ -133,6 +133,23 @@ export const useAttendance = () => {
     };
 
     /**
+     * Check if student has attended a specific session
+     */
+    const hasAttendedSession = async (studentAddress: string, appId: number, sessionId: string): Promise<boolean> => {
+        try {
+            const attendance = await getAttendanceRecord(studentAddress, appId);
+            if (!attendance) return false;
+            
+            // Check for session-specific key: "checked_in_<session_id>"
+            const sessionKey = `checked_in${sessionId}`;
+            return attendance[sessionKey] === 1;
+        } catch (error) {
+            console.error('Error checking session attendance:', error);
+            return false;
+        }
+    };
+
+    /**
      * Get session information
      */
     const getSessionInfo = async (appId: number) => {
@@ -321,6 +338,7 @@ export const useAttendance = () => {
         markAttendance,
         createSession,
         getAttendanceRecord,
+        hasAttendedSession,
         getSessionInfo,
         addTeacher,
         removeTeacher,

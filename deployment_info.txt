@@ -1,13 +1,5 @@
-App ID: 755431825
-Session ID: NLP
-Session Name: NLP
+App ID: 755432657
+Session ID: FL_12_02_2026
+Session Name: Federated Learning
 Creator: ILUHQ3QQXFHDP3N7FQAREPGHQVVVPQN2BMN3H3722LT5BSMRVPWP6T4GF4
-Explorer: https://testnet.algoexplorer.io/application/755431825
-
-
-IMPORTANT NOTES:
-- This is the NEW contract with anti-proxy security features
-- Uses round-based timing (start_round, end_round)
-- Wallet-bound QR codes with SHA256 validation
-- Creator wallet is already opted in with teacher privileges
-- Frontend App ID updated to: 755431825
+Explorer: https://testnet.algoexplorer.io/application/755432657

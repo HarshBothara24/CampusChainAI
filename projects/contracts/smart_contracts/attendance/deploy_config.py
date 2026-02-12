@@ -18,7 +18,7 @@ class AttendanceDeployConfig:
     )
     
     LOCAL_SCHEMA = StateSchema(
-        num_uints=3,  # checked_in, check_in_round, is_teacher
+        num_uints=17,  # is_teacher (1) + up to 16 sessions (checked_in + check_in_round for 8 sessions)
         num_byte_slices=0
     )
     

@@ -28,14 +28,17 @@ def approval_program():
     
     Local State Schema:
     - For students:
-      - checked_in (Int): Attendance status (1=present, 0=absent)
-      - check_in_round (Int): Round number when attendance was marked
+      - checked_in_<session_id> (Int): Attendance status per session (1=present, 0=absent)
+      - check_in_round_<session_id> (Int): Round number when attendance was marked for that session
     - For teachers:
       - is_teacher (Int): Authorization flag (1=authorized, 0=not authorized)
     
+    Note: Students can mark attendance for multiple sessions. Each session creates
+    separate local state entries with the session_id as part of the key.
+    
     Security Features:
     - QR codes are wallet-bound (cannot be shared)
-    - QR codes expire after 5 rounds (~15 seconds)
+    - QR codes expire after 20 rounds (~60 seconds)
     - Hash validation: SHA256(session_id + qr_round + student_address)
     """
     
@@ -124,8 +127,9 @@ def approval_program():
         # 3. Verify session_id matches
         Assert(Txn.application_args[1] == App.globalGet(session_id_key)),
         
-        # 4. Verify student hasn't already checked in (duplicate prevention)
-        Assert(App.localGet(Txn.sender(), checked_in_key) == Int(0)),
+        # 4. Verify student hasn't already checked in for THIS session (duplicate prevention)
+        # Use session-specific key: "checked_in_<session_id>"
+        Assert(App.localGet(Txn.sender(), Concat(checked_in_key, Txn.application_args[1])) == Int(0)),
         
         # 5. Verify qr_round is 8 bytes (uint64)
         Assert(Len(Txn.application_args[2]) == Int(8)),
@@ -146,9 +150,10 @@ def approval_program():
             )
         ),
         
-        # 8. Mark attendance in local state
-        App.localPut(Txn.sender(), checked_in_key, Int(1)),
-        App.localPut(Txn.sender(), check_in_round_key, Global.round()),
+        # 8. Mark attendance in local state with session-specific keys
+        # Key format: "checked_in_<session_id>" and "check_in_round_<session_id>"
+        App.localPut(Txn.sender(), Concat(checked_in_key, Txn.application_args[1]), Int(1)),
+        App.localPut(Txn.sender(), Concat(check_in_round_key, Txn.application_args[1]), Global.round()),
         
         # 9. Increment total attendance count
         App.globalPut(total_attendance_key, App.globalGet(total_attendance_key) + Int(1)),
@@ -198,9 +203,8 @@ def approval_program():
     
     # Method: Opt-in (required for local state)
     on_opt_in = Seq([
-        # Initialize local state (works for both students and teachers)
-        App.localPut(Txn.sender(), checked_in_key, Int(0)),
-        App.localPut(Txn.sender(), check_in_round_key, Int(0)),
+        # Initialize local state for teachers only
+        # Students don't need initialization - session-specific keys are created on first attendance
         # If sender is creator, automatically grant teacher privileges
         If(Txn.sender() == App.globalGet(creator_key))
         .Then(App.localPut(Txn.sender(), is_teacher_key, Int(1)))

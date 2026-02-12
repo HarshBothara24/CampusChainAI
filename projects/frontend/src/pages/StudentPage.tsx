@@ -5,14 +5,13 @@ import { QRScanner } from '../components/attendance/QRScanner';
 import { CheckCircle, QrCode, Shield, Loader, AlertCircle, Keyboard, Camera } from 'lucide-react';
 import { useAttendance } from '../utils/useAttendance';
 import { ATTENDANCE_APP_ID } from '../utils/algorand';
-import { getAlgodConfigFromViteEnvironment } from '../utils/network/getAlgoClientConfigs';
 import algosdk from 'algosdk';
 
 type FlowState = 'connect' | 'scan' | 'confirm' | 'processing' | 'success' | 'error';
 
 export const StudentPage: React.FC = () => {
     const { activeAddress } = useWallet();
-    const { optIn, markAttendance, getAttendanceRecord } = useAttendance();
+    const { optIn, markAttendance, getAttendanceRecord, hasAttendedSession } = useAttendance();
 
     const [flowState, setFlowState] = React.useState<FlowState>('connect');
     const [sessionId, setSessionId] = React.useState('');
@@ -20,6 +19,7 @@ export const StudentPage: React.FC = () => {
     const [txId, setTxId] = React.useState('');
     const [error, setError] = React.useState('');
     const [needsOptIn, setNeedsOptIn] = React.useState(false);
+    const [alreadyAttended, setAlreadyAttended] = React.useState(false);
     const [showScanner, setShowScanner] = React.useState(false);
     const [showManualInput, setShowManualInput] = React.useState(false);
 
@@ -46,8 +46,12 @@ export const StudentPage: React.FC = () => {
 
             if (!attendance) {
                 setNeedsOptIn(true);
+                setAlreadyAttended(false);
             } else {
                 setNeedsOptIn(false);
+                // Check if already attended this specific session
+                const attended = await hasAttendedSession(activeAddress!, appIdNum, qrData.sessionId);
+                setAlreadyAttended(attended);
             }
 
             setFlowState('confirm');
@@ -271,6 +275,17 @@ export const StudentPage: React.FC = () => {
                             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
                                 <p className="text-sm text-yellow-800">
                                     You need to opt-in to this app before marking attendance. This is a one-time action.
+                                </p>
+                            </div>
+                        )}
+
+                        {alreadyAttended && !needsOptIn && (
+                            <div className="bg-orange-50 border border-orange-200 rounded-md p-4 mb-6">
+                                <p className="text-sm text-orange-800 font-medium mb-1">
+                                    ⚠️ Already Attended
+                                </p>
+                                <p className="text-sm text-orange-700">
+                                    You have already marked attendance for this session. Submitting again will fail.
                                 </p>
                             </div>
                         )}

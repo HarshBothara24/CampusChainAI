@@ -4,13 +4,15 @@ import { WalletButton } from '../components/attendance/WalletButton';
 import { DynamicQRDisplay } from '../components/attendance/DynamicQRDisplay';
 import { AttendanceTable } from '../components/attendance/AttendanceTable';
 import { SessionCard } from '../components/attendance/SessionCard';
-import { PlusCircle, LayoutDashboard, FileText, Shield, Loader } from 'lucide-react';
+import { PlusCircle, LayoutDashboard, FileText, Shield, Loader, Users } from 'lucide-react';
 import { useAttendance } from '../utils/useAttendance';
 import { ATTENDANCE_APP_ID } from '../utils/algorand';
+import { getAlgodConfigFromViteEnvironment } from '../utils/network/getAlgoClientConfigs';
+import algosdk from 'algosdk';
 
 export const TeacherDashboard: React.FC = () => {
     const { activeAddress } = useWallet();
-    const { createSession, getSessionInfo } = useAttendance();
+    const { createSession, getSessionInfo, getOptedInAccounts } = useAttendance();
 
     const [activeView, setActiveView] = React.useState<'create' | 'active' | 'records'>('create');
     const [sessionId, setSessionId] = React.useState('');
@@ -21,11 +23,85 @@ export const TeacherDashboard: React.FC = () => {
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState('');
     const [success, setSuccess] = React.useState('');
+    const [attendanceRecords, setAttendanceRecords] = React.useState<any[]>([]);
 
     // Load session info on mount
     React.useEffect(() => {
         loadSessionInfo();
     }, []);
+
+    // Load attendance records when viewing records tab
+    React.useEffect(() => {
+        if (activeView === 'records' && currentSession) {
+            loadAttendanceRecords();
+        }
+    }, [activeView, currentSession]);
+
+    const loadAttendanceRecords = async () => {
+        try {
+            const accounts = await getOptedInAccounts(ATTENDANCE_APP_ID);
+            
+            // Filter accounts that have checked_in = 1
+            const attendedStudents = accounts.filter((account: any) => account.checked_in === 1);
+            
+            // Get algod client to fetch block timestamps
+            const algodConfig = getAlgodConfigFromViteEnvironment();
+            const algodClient = new algosdk.Algodv2(
+                String(algodConfig.token || ''),
+                algodConfig.server,
+                String(algodConfig.port || 443)
+            );
+            
+            // Fetch timestamps for each check-in round
+            const recordsWithTimestamps = await Promise.all(
+                attendedStudents.map(async (account: any) => {
+                    try {
+                        const checkInRound = account.check_in_round || 0;
+                        
+                        // Fetch block info to get timestamp
+                        if (checkInRound > 0) {
+                            const block = await algodClient.block(checkInRound).do();
+                            // The timestamp is at block.ts (not block.block.ts)
+                            const timestamp = (block as any).ts || Math.floor(Date.now() / 1000);
+                            
+                            return {
+                                wallet: account.address,
+                                timestamp: timestamp,
+                                round: checkInRound,
+                                riskScore: 0,
+                                verified: true,
+                            };
+                        }
+                        
+                        return {
+                            wallet: account.address,
+                            timestamp: Math.floor(Date.now() / 1000),
+                            round: checkInRound,
+                            riskScore: 0,
+                            verified: true,
+                        };
+                    } catch (err) {
+                        console.error(`Error fetching block for round ${account.check_in_round}:`, err);
+                        return {
+                            wallet: account.address,
+                            timestamp: Math.floor(Date.now() / 1000),
+                            round: account.check_in_round || 0,
+                            riskScore: 0,
+                            verified: true,
+                        };
+                    }
+                })
+            );
+            
+            // Sort by timestamp (most recent first)
+            recordsWithTimestamps.sort((a, b) => b.timestamp - a.timestamp);
+            
+            setAttendanceRecords(recordsWithTimestamps);
+        } catch (err) {
+            console.error('Error loading attendance records:', err);
+            setAttendanceRecords([]);
+        }
+    };
 
     const loadSessionInfo = async () => {
         try {
@@ -417,10 +493,65 @@ export const TeacherDashboard: React.FC = () => {
                         {/* Attendance Records View */}
                         {activeView === 'records' && (
                             <div className="space-y-4">
-                                <h2 className="text-xl font-semibold text-slate-900">Attendance Records</h2>
-                                <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-                                    <AttendanceTable records={mockAttendance} />
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-xl font-semibold text-slate-900">Attendance Records</h2>
+                                    {currentSession && (
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                onClick={loadAttendanceRecords}
+                                                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors"
+                                            >
+                                                <Loader className="w-4 h-4" />
+                                                Refresh
+                                            </button>
+                                            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                                <Users className="w-5 h-5 text-emerald-600" />
+                                                <span className="text-sm font-medium text-emerald-900">
+                                                    {attendanceRecords.length} Students Marked
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
+                                
+                                {currentSession ? (
+                                    <>
+                                        <div className="bg-white border border-slate-200 rounded-lg p-4 mb-4">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                <div>
+                                                    <p className="text-xs text-slate-500">Session</p>
+                                                    <p className="text-sm font-medium text-slate-900">{currentSession.sessionName}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-slate-500">Session ID</p>
+                                                    <p className="text-sm font-mono text-slate-900">{currentSession.sessionId}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-slate-500">Status</p>
+                                                    <p className="text-sm font-medium text-emerald-600">Active</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-slate-500">Total Attendance</p>
+                                                    <p className="text-sm font-medium text-slate-900">{attendanceRecords.length}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+                                            <AttendanceTable records={attendanceRecords} />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="bg-white border border-slate-200 rounded-lg p-8 text-center">
+                                        <p className="text-slate-500">No active session</p>
+                                        <button
+                                            onClick={() => setActiveView('create')}
+                                            className="mt-4 text-emerald-600 hover:text-emerald-700 font-medium"
+                                        >
+                                            Create a session to view records
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

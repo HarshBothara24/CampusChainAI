@@ -5,6 +5,7 @@ import { RiskBadge } from './RiskBadge';
 interface AttendanceRecord {
     wallet: string;
     timestamp: number;
+    round?: number;
     riskScore: number;
     verified: boolean;
 }
@@ -19,9 +20,13 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({ records }) => 
     };
 
     const formatTimestamp = (timestamp: number) => {
-        return new Date(timestamp * 1000).toLocaleTimeString('en-US', {
+        const date = new Date(timestamp * 1000);
+        return date.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
+            second: '2-digit',
         });
     };
 
@@ -57,8 +62,15 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({ records }) => 
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-slate-900">
                                     {formatWallet(record.wallet)}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                                    {formatTimestamp(record.timestamp)}
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-slate-700">
+                                        {formatTimestamp(record.timestamp)}
+                                    </div>
+                                    {record.round && (
+                                        <div className="text-xs text-slate-500">
+                                            Round: {record.round}
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <RiskBadge score={record.riskScore} />

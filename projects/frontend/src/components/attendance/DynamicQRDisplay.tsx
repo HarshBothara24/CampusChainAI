@@ -32,7 +32,7 @@ export const DynamicQRDisplay: React.FC<DynamicQRDisplayProps> = ({
 }) => {
     const [qrDataURL, setQrDataURL] = useState<string>('');
     const [currentRound, setCurrentRound] = useState<number>(0);
-    const [expiresIn, setExpiresIn] = useState<number>(15);
+    const [expiresIn, setExpiresIn] = useState<number>(60);
     const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
     // Initialize Algod client
@@ -68,7 +68,7 @@ export const DynamicQRDisplay: React.FC<DynamicQRDisplayProps> = ({
             // Generate QR code
             const qrString = JSON.stringify(qrPayload);
             setQrDataURL(qrString);
-            setExpiresIn(15); // Reset countdown
+            setExpiresIn(60); // Reset countdown to 60 seconds
         } catch (error) {
             console.error('Error generating dynamic QR:', error);
         } finally {
@@ -81,11 +81,11 @@ export const DynamicQRDisplay: React.FC<DynamicQRDisplayProps> = ({
         generateDynamicQR();
     }, []);
 
-    // Auto-refresh QR every 12 seconds (before 5-round expiry)
+    // Auto-refresh QR every 45 seconds (before 20-round expiry)
     useEffect(() => {
         const refreshInterval = setInterval(() => {
             generateDynamicQR();
-        }, 12000); // 12 seconds
+        }, 45000); // 45 seconds
 
         return () => clearInterval(refreshInterval);
     }, [sessionId, appId]);
@@ -95,7 +95,7 @@ export const DynamicQRDisplay: React.FC<DynamicQRDisplayProps> = ({
         const countdownInterval = setInterval(() => {
             setExpiresIn((prev) => {
                 if (prev <= 1) {
-                    return 15; // Reset when it hits 0
+                    return 60; // Reset when it hits 0
                 }
                 return prev - 1;
             });
@@ -168,7 +168,7 @@ export const DynamicQRDisplay: React.FC<DynamicQRDisplayProps> = ({
                     🔒 Anti-Proxy Security:
                 </p>
                 <ul className="text-xs text-blue-800 space-y-0.5">
-                    <li>• QR refreshes every 12 seconds</li>
+                    <li>• QR refreshes every 45 seconds</li>
                     <li>• Each student generates unique hash with their wallet</li>
                     <li>• Sharing QR won't work - hash validation fails</li>
                     <li>• Verified on-chain</li>

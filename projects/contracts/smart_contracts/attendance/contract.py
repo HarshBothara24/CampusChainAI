@@ -55,7 +55,7 @@ def approval_program():
     is_teacher_key = Bytes("is_teacher")
     
     # Constants
-    QR_VALIDITY_ROUNDS = Int(5)  # QR valid for 5 rounds (~15 seconds)
+    QR_VALIDITY_ROUNDS = Int(20)  # QR valid for 20 rounds (~60 seconds)
     
     # Helper function to check if sender is authorized teacher
     is_authorized_teacher = Or(
@@ -130,7 +130,7 @@ def approval_program():
         # 5. Verify qr_round is 8 bytes (uint64)
         Assert(Len(Txn.application_args[2]) == Int(8)),
         
-        # 6. Verify QR is not older than 5 rounds (anti-replay, ~15 seconds)
+        # 6. Verify QR is not older than 20 rounds (anti-replay, ~60 seconds)
         Assert(Global.round() - Btoi(Txn.application_args[2]) <= QR_VALIDITY_ROUNDS),
         
         # 7. Verify wallet-bound hash

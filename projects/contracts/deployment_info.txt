@@ -1,5 +1,5 @@
-App ID: 755378805
-Session ID: TOC_11_02_2026
-Session Name: TOC
+App ID: 755431825
+Session ID: NLP
+Session Name: NLP
 Creator: ILUHQ3QQXFHDP3N7FQAREPGHQVVVPQN2BMN3H3722LT5BSMRVPWP6T4GF4
-Explorer: https://testnet.algoexplorer.io/application/755378805
+Explorer: https://testnet.algoexplorer.io/application/755431825

@@ -29,11 +29,14 @@ export const StudentPage: React.FC = () => {
         }
     }, [activeAddress, flowState]);
 
+    const [qrRound, setQrRound] = React.useState<number>(0);
+
     const handleQRScan = async (data: string) => {
         try {
             const qrData = JSON.parse(data);
             setSessionId(qrData.sessionId || '');
             setAppId(qrData.appId?.toString() || ATTENDANCE_APP_ID.toString());
+            setQrRound(qrData.qrRound || 0); // Store the round from QR
             setShowScanner(false);
             setShowManualInput(false);
             
@@ -105,18 +108,15 @@ export const StudentPage: React.FC = () => {
                 throw new Error('No active wallet connected');
             }
 
+            if (!qrRound || qrRound === 0) {
+                throw new Error('Invalid QR code - missing round information');
+            }
+
             const appIdNum = parseInt(appId);
 
-            // Get current round from blockchain
-            const algodConfig = getAlgodConfigFromViteEnvironment();
-            const algodClient = new algosdk.Algodv2(
-                String(algodConfig.token || ''),
-                algodConfig.server,
-                String(algodConfig.port || 443)
-            );
-            
-            const status = await algodClient.status().do();
-            const qrRound = Number(status.lastRound);
+            // Use the qrRound from the scanned QR code (NOT current round)
+            // This ensures the hash matches what the teacher's QR expects
+            console.log('Using qrRound from QR:', qrRound);
 
             // Generate wallet-bound hash: SHA256(sessionId + qrRound + studentAddress)
             const sessionIdBytes = new TextEncoder().encode(sessionId);
@@ -140,6 +140,13 @@ export const StudentPage: React.FC = () => {
             // Compute SHA256 hash
             const hashBuffer = await crypto.subtle.digest('SHA-256', combined);
             const qrHash = new Uint8Array(hashBuffer);
+
+            console.log('Hash components:', {
+                sessionId,
+                qrRound,
+                studentAddress: activeAddress,
+                hashHex: Array.from(qrHash).map(b => b.toString(16).padStart(2, '0')).join('')
+            });
 
             // Call secure mark attendance with 4 args
             const transactionId = await markAttendance(appIdNum, sessionId, qrRound, qrHash);

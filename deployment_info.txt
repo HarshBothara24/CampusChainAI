@@ -1,8 +1,8 @@
-App ID: 755378805
-Session ID: TOC_11_02_2026
-Session Name: TOC
+App ID: 755431825
+Session ID: NLP
+Session Name: NLP
 Creator: ILUHQ3QQXFHDP3N7FQAREPGHQVVVPQN2BMN3H3722LT5BSMRVPWP6T4GF4
-Explorer: https://testnet.algoexplorer.io/application/755378805
+Explorer: https://testnet.algoexplorer.io/application/755431825
 
 
 IMPORTANT NOTES:
@@ -10,4 +10,4 @@ IMPORTANT NOTES:
 - Uses round-based timing (start_round, end_round)
 - Wallet-bound QR codes with SHA256 validation
 - Creator wallet is already opted in with teacher privileges
-- Frontend App ID updated to: 755378805
+- Frontend App ID updated to: 755431825

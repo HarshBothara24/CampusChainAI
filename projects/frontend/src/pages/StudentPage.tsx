@@ -33,15 +33,18 @@ export const StudentPage: React.FC = () => {
         try {
             const qrData = JSON.parse(data);
             setSessionId(qrData.sessionId || '');
+            setAppId(qrData.appId?.toString() || ATTENDANCE_APP_ID.toString());
             setShowScanner(false);
             setShowManualInput(false);
             
-            // Auto-proceed to confirmation
-            const appIdNum = parseInt(appId);
+            // Check if user needs to opt-in
+            const appIdNum = parseInt(qrData.appId || ATTENDANCE_APP_ID);
             const attendance = await getAttendanceRecord(activeAddress!, appIdNum);
 
             if (!attendance) {
                 setNeedsOptIn(true);
+            } else {
+                setNeedsOptIn(false);
             }
 
             setFlowState('confirm');
@@ -80,8 +83,16 @@ export const StudentPage: React.FC = () => {
             setFlowState('confirm');
         } catch (err: any) {
             console.error('Opt-in error:', err);
-            setError(err.message || 'Failed to opt-in to the app');
-            setFlowState('error');
+            
+            // Check if error is "already opted in"
+            if (err.message?.includes('already opted in') || err.message?.includes('has already opted')) {
+                console.log('User already opted in, proceeding...');
+                setNeedsOptIn(false);
+                setFlowState('confirm');
+            } else {
+                setError(err.message || 'Failed to opt-in to the app');
+                setFlowState('error');
+            }
         }
     };
 
@@ -99,13 +110,13 @@ export const StudentPage: React.FC = () => {
             // Get current round from blockchain
             const algodConfig = getAlgodConfigFromViteEnvironment();
             const algodClient = new algosdk.Algodv2(
-                algodConfig.token,
+                String(algodConfig.token || ''),
                 algodConfig.server,
-                algodConfig.port
+                String(algodConfig.port || 443)
             );
             
             const status = await algodClient.status().do();
-            const qrRound = status['last-round'];
+            const qrRound = Number(status.lastRound);
 
             // Generate wallet-bound hash: SHA256(sessionId + qrRound + studentAddress)
             const sessionIdBytes = new TextEncoder().encode(sessionId);

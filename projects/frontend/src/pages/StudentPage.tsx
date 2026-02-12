@@ -19,6 +19,7 @@ export const StudentPage: React.FC = () => {
     const [flowState, setFlowState] = React.useState<FlowState>('connect');
     const [sessionId, setSessionId] = React.useState('');
     const [appId, setAppId] = React.useState(ATTENDANCE_APP_ID.toString());
+    const [qrRound, setQrRound] = React.useState<number>(0); // Store qrRound from QR code
     const [txId, setTxId] = React.useState('');
     const [error, setError] = React.useState('');
     const [needsOptIn, setNeedsOptIn] = React.useState(false);
@@ -49,6 +50,7 @@ export const StudentPage: React.FC = () => {
             const qrData = JSON.parse(data);
             setSessionId(qrData.sessionId || '');
             setAppId(qrData.appId?.toString() || ATTENDANCE_APP_ID.toString());
+            setQrRound(qrData.qrRound || 0); // Save qrRound from QR
             setShowScanner(false);
             setShowManualInput(false);
             
@@ -122,16 +124,15 @@ export const StudentPage: React.FC = () => {
 
             const appIdNum = parseInt(appId);
 
-            // Get current round from blockchain
-            const algodConfig = getAlgodConfigFromViteEnvironment();
-            const algodClient = new algosdk.Algodv2(
-                String(algodConfig.token || ''),
-                algodConfig.server,
-                String(algodConfig.port || 443)
-            );
-            
-            const status = await algodClient.status().do();
-            const qrRound = Number(status.lastRound);
+            // Use qrRound from the scanned QR code (NOT current round)
+            // This is critical for hash validation
+            if (!qrRound || qrRound === 0) {
+                throw new Error('Invalid QR code - missing round number');
+            }
+
+            console.log('Using qrRound from QR:', qrRound);
+            console.log('Session ID:', sessionId);
+            console.log('Student address:', activeAddress);
 
             // Generate wallet-bound hash: SHA256(sessionId + qrRound + studentAddress)
             const sessionIdBytes = new TextEncoder().encode(sessionId);
@@ -155,6 +156,8 @@ export const StudentPage: React.FC = () => {
             // Compute SHA256 hash
             const hashBuffer = await crypto.subtle.digest('SHA-256', combined);
             const qrHash = new Uint8Array(hashBuffer);
+
+            console.log('Computed hash:', Array.from(qrHash).map(b => b.toString(16).padStart(2, '0')).join(''));
 
             // Call secure mark attendance with 4 args
             const transactionId = await markAttendance(appIdNum, sessionId, qrRound, qrHash);
@@ -396,6 +399,7 @@ export const StudentPage: React.FC = () => {
                                 setFlowState('scan');
                                 setSessionId('');
                                 setAppId(ATTENDANCE_APP_ID.toString());
+                                setQrRound(0); // Reset qrRound
                                 setTxId('');
                             }}
                             className="text-emerald-600 hover:text-emerald-700 font-medium"

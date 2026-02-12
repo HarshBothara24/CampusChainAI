@@ -1,7 +1,8 @@
 import React from 'react';
 import { useWallet } from '@txnlab/use-wallet-react';
 import { WalletButton } from '../components/attendance/WalletButton';
-import { CheckCircle, QrCode, Shield, Loader, AlertCircle } from 'lucide-react';
+import { QRScanner } from '../components/attendance/QRScanner';
+import { CheckCircle, QrCode, Shield, Loader, AlertCircle, Keyboard, Camera } from 'lucide-react';
 import { useAttendance } from '../utils/useAttendance';
 import { ATTENDANCE_APP_ID } from '../utils/algorand';
 import { getAlgodConfigFromViteEnvironment } from '../utils/network/getAlgoClientConfigs';
@@ -19,12 +20,37 @@ export const StudentPage: React.FC = () => {
     const [txId, setTxId] = React.useState('');
     const [error, setError] = React.useState('');
     const [needsOptIn, setNeedsOptIn] = React.useState(false);
+    const [showScanner, setShowScanner] = React.useState(false);
+    const [showManualInput, setShowManualInput] = React.useState(false);
 
     React.useEffect(() => {
         if (activeAddress && flowState === 'connect') {
             setFlowState('scan');
         }
     }, [activeAddress, flowState]);
+
+    const handleQRScan = async (data: string) => {
+        try {
+            const qrData = JSON.parse(data);
+            setSessionId(qrData.sessionId || '');
+            setShowScanner(false);
+            setShowManualInput(false);
+            
+            // Auto-proceed to confirmation
+            const appIdNum = parseInt(appId);
+            const attendance = await getAttendanceRecord(activeAddress!, appIdNum);
+
+            if (!attendance) {
+                setNeedsOptIn(true);
+            }
+
+            setFlowState('confirm');
+        } catch (err) {
+            console.error('QR scan error:', err);
+            setError('Invalid QR code format');
+            setShowScanner(false);
+        }
+    };
 
     const handleManualInput = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -153,37 +179,66 @@ export const StudentPage: React.FC = () => {
                             <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <QrCode className="w-8 h-8 text-emerald-600" />
                             </div>
-                            <h2 className="text-2xl font-semibold text-slate-900 mb-2">Scan QR Code</h2>
+                            <h2 className="text-2xl font-semibold text-slate-900 mb-2">Mark Attendance</h2>
                             <p className="text-slate-600">
-                                Scan the QR code displayed by your teacher or enter details manually
+                                Scan the QR code or enter session details manually
                             </p>
                         </div>
 
-                        {/* Manual Input Form */}
-                        <form onSubmit={handleManualInput} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">
-                                    Session ID
-                                </label>
-                                <input
-                                    type="text"
-                                    value={sessionId}
-                                    onChange={(e) => setSessionId(e.target.value)}
-                                    placeholder="e.g., NLP01_2026_02_11"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    required
-                                />
-                                <p className="mt-1 text-xs text-slate-500">
-                                    Enter the session ID provided by your teacher
-                                </p>
-                            </div>
+                        {/* Action Buttons */}
+                        <div className="space-y-3 mb-6">
                             <button
-                                type="submit"
-                                className="w-full px-4 py-2 bg-emerald-600 text-white font-medium rounded-md hover:bg-emerald-700 transition-colors"
+                                onClick={() => setShowScanner(true)}
+                                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
                             >
-                                Continue
+                                <Camera className="w-5 h-5" />
+                                Scan QR Code
                             </button>
-                        </form>
+                            
+                            <button
+                                onClick={() => setShowManualInput(!showManualInput)}
+                                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors"
+                            >
+                                <Keyboard className="w-5 h-5" />
+                                Enter Session ID Manually
+                            </button>
+                        </div>
+
+                        {/* Manual Input Form (Collapsible) */}
+                        {showManualInput && (
+                            <form onSubmit={handleManualInput} className="space-y-4 pt-4 border-t border-slate-200">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        Session ID
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={sessionId}
+                                        onChange={(e) => setSessionId(e.target.value)}
+                                        placeholder="e.g., GenAI_11_02_2026"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                        required
+                                    />
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        Enter the session ID provided by your teacher
+                                    </p>
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="w-full px-4 py-2 bg-emerald-600 text-white font-medium rounded-md hover:bg-emerald-700 transition-colors"
+                                >
+                                    Continue
+                                </button>
+                            </form>
+                        )}
+
+                        {/* QR Scanner Modal */}
+                        {showScanner && (
+                            <QRScanner
+                                onScan={handleQRScan}
+                                onClose={() => setShowScanner(false)}
+                            />
+                        )}
                     </div>
                 )}
 
